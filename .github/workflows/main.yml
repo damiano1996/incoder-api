@@ -1,0 +1,59 @@
+name: Build and Push
+
+# Controls when the workflow will run
+on:
+  # Trigger the workflow only when a tag is pushed on the "main" branch
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+  # Allows you to run this workflow manually from the Actions tab
+  # workflow_dispatch:
+
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      - name: Free Up Disk Space
+        # Free disk space on the GitHub Actions runner to avoid build issues due to limited storage.
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+
+      - name: Checkout Repository
+        # Checks out the repository under $GITHUB_WORKSPACE to access the code and Dockerfile for building the image.
+        uses: actions/checkout@v3
+
+      - name: Set Up Docker Buildx
+        # Set up Docker Buildx, a CLI plugin for extended build capabilities such as multi-platform builds and faster caching.
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log in to GitHub Container Registry
+        # Authenticate to the GitHub Container Registry to push the Docker image.
+        uses: docker/login-action@v1.10.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }} # Authenticates using the current GitHub actor
+          password: ${{ secrets.GITHUB_TOKEN }} # Uses the automatically provided GitHub token for authentication
+
+      - name: Lowercase Repository Name and Username
+        # Converts the repository name and username to lowercase for consistent image tagging in Docker.
+        run: echo "REPO=${GITHUB_REPOSITORY,,}" >>${GITHUB_ENV}
+
+      - name: Extract Tag Version
+        id: extract_tag
+        # Extracts the tag version from the GitHub reference and saves it to the environment for use in tagging the Docker image.
+        run: echo "TAG_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+
+      - name: Build and Push Docker Image to Registry
+        # Builds the Docker image using the specified Dockerfile and pushes it to the GitHub Container Registry with the tag as the version.
+        uses: docker/build-push-action@v4
+        with:
+          push: true # Push the image to the registry after building it
+          tags: ghcr.io/${{ env.REPO }}:${{ env.TAG_VERSION }} # Tag the image with the extracted version from the tag
+          file: ./Dockerfile # Path to the Dockerfile used for building the image

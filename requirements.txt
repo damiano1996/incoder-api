@@ -1,0 +1,7 @@
+fastapi==0.112.0
+uvicorn[standard]
+
+transformers==4.43.3
+torch==2.4.0
+
+colorlog==6.8.2
